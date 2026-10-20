@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>电量审核助手</title>
+<style>
+:root {
+  --primary: #1677ff;
+  --success: #52c41a;
+  --warning: #faad14;
+  --danger: #ff4d4f;
+  --bg: #f8f9fc;
+  --card-bg: #ffffff;
+  --text-main: #1f2329;
+  --text-sub: #86909c;
+  --border: #e5e6eb;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text-main);
+  min-height: 100vh;
+  padding-bottom: 90px;
+}
+.hdr {
+  background: #fff;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+.hdr-title { display: flex; align-items: center; justify-content: space-between; }
+.hdr h1 { font-size: 19px; font-weight: 700; color: #111; display: flex; align-items: center; gap: 6px; }
+.hdr p { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
+.badge-status { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: #e6f4ff; color: var(--primary); font-weight: 600; }
+.wrap { padding: 12px 14px; }
+.upload-card {
+  position: relative;
+  background: #fff;
+  border: 1.5px dashed #c9cdd4;
+  border-radius: 14px;
+  padding: 20px 16px;
+  text-align: center;
+  transition: all 0.25s ease;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+.upload-card:active { transform: scale(0.99); }
+.upload-card.scanning { border-color: var(--primary); background: #f0f7ff; }
+.upload-card.done { border-style: solid; border-color: #b7eb8f; background: #fcffe6; padding: 12px; }
+.fio { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; }
+.up-icon { font-size: 32px; margin-bottom: 6px; }
+.up-text { font-size: 14px; font-weight: 600; color: #4e5969; }
+.up-hint { font-size: 11px; color: #86909c; margin-top: 4px; }
+.preview-box { display: none; margin-top: 10px; position: relative; }
+.preview-box img { max-width: 100%; max-height: 220px; border-radius: 8px; display: block; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.re-pick-hint { font-size: 12px; color: var(--primary); margin-top: 8px; font-weight: 500; }
+.spinner {
+  display: inline-block; width: 16px; height: 16px;
+  border: 2px solid var(--primary); border-top-color: transparent;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.summary-panel {
+  display: grid;
+  grid-template-columns: 1.1fr 1.1fr 70px 70px;
+  gap: 8px;
+  margin-top: 12px;
+}
+.sum-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 4px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+  border: 1px solid #f0f0f0;
+}
+.sum-box .num { font-size: 16px; font-weight: 700; color: #111; line-height: 1.2; word-break: break-all; }
+.sum-box .lbl { font-size: 11px; color: var(--text-sub); margin-top: 4px; }
+.sum-box.calc .num { color: var(--primary); }
+.sum-box.fill .num { color: #722ed1; }
+.sum-box.ok .num { color: var(--success); }
+.sum-box.err .num { color: var(--danger); }
+.list-panel { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.item-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid #eaeaea;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  transition: background 0.15s;
+}
+.item-card:active { background: #fbfbfb; }
+.item-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.item-title-group { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.item-badge { font-size: 17px; flex-shrink: 0; }
+.item-name { font-size: 14px; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.time-tag { font-size: 11px; background: #e6f4ff; color: var(--primary); padding: 1px 6px; border-radius: 4px; margin-left: 6px; font-weight: 500; }
+.item-value-box { text-align: right; flex-shrink: 0; }
+.item-val { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.item-diff { font-size: 11px; margin-top: 2px; }
+.item-card.is-err { border-left: 4px solid var(--danger); }
+.item-card.is-ok { border-left: 4px solid var(--success); }
+.item-card.is-warn { border-left: 4px solid var(--warning); }
+.item-card.is-pending { border-left: 4px solid #c9cdd4; }
+.item-detail {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+  color: #4e5969;
+  line-height: 1.6;
+}
+.detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 8px; margin-top: 4px; }
+.detail-tag { background: #f2f3f5; padding: 2px 6px; border-radius: 4px; font-size: 11px; display: inline-block; }
+.notice-box {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.notice-box.err { background: #fff2f0; color: var(--danger); border: 1px solid #ffccc7; }
+.bottom-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  padding: 10px 16px max(10px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 10px;
+  z-index: 100;
+}
+.btn {
+  flex: 1; padding: 12px; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: opacity 0.2s;
+}
+.btn:active { opacity: 0.8; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:disabled { background: #d9d9d9; color: #8c8c8c; cursor: not-allowed; }
+.btn-outline { background: #f2f3f5; color: #4e5969; flex: 0.4; }
+.toast {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.78); color: #fff;
+  padding: 10px 18px; border-radius: 8px; font-size: 13px;
+  z-index: 999; pointer-events: none; opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.toast.show { opacity: 1; }
+.hid { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-title">
+    <h1>⚡ 电量审核助手</h1>
+    <span class="badge-status" id="typeBadge">待拍照</span>
+  </div>
+  <p>拍照即时核对底度、读数、倍率及抄表计算量</p>
+</div>
+
+<div class="wrap">
+  <div class="upload-card" id="upCard">
+    <input type="file" id="fi" class="fio" accept="image/*" onchange="handleFileChange(this)">
+    <div id="upInitial">
+      <div class="up-icon">📷</div>
+      <div class="up-text">点击拍摄或上传电量抄表单</div>
+      <div class="up-hint">智能自适应：单表全时段合计 / 大表分班核算</div>
+    </div>
+    <div id="upProcessing" class="hid">
+      <div style="font-size:15px; font-weight:600; color:var(--primary); margin:8px 0;">
+        <span class="spinner"></span><span id="procText">正在优化图像并识别...</span>
+      </div>
+      <div class="up-hint">已自动采用高保真边缘压缩</div>
+    </div>
+    <div class="preview-box" id="prevBox">
+      <img id="prevImg" src="" alt="预览">
+      <div class="re-pick-hint">📷 点击此处更换照片重核</div>
+    </div>
+  </div>
+
+  <div id="noticeErr" class="notice-box err hid" style="margin-top:12px;"></div>
+
+  <div class="summary-panel hid" id="summaryPanel">
+    <div class="sum-box calc">
+      <div class="num" id="sCalc">0</div>
+      <div class="lbl" id="lblCalc">计算合计</div>
+    </div>
+    <div class="sum-box fill">
+      <div class="num" id="sFill">0</div>
+      <div class="lbl" id="lblFill">填写合计</div>
+    </div>
+    <div class="sum-box ok">
+      <div class="num" id="sPass">0</div>
+      <div class="lbl">✅ 一致</div>
+    </div>
+    <div class="sum-box err">
+      <div class="num" id="sFail">0</div>
+      <div class="lbl">❌ 差异</div>
+    </div>
+  </div>
+
+  <div class="list-panel" id="listPanel"></div>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn btn-outline" onclick="clearAll()">🗑️ 清空</button>
+  <button class="btn btn-primary" id="cpBtn" onclick="copyText()" disabled>📋 复制审核结果</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let rows = [], currentType = 1, gSkip = 0;
+let tableTotalFill = null; // 纸面上专门填写的“合计”行数值
+let currentBlobUrl = null;
+let curStat = { calc: 0, fill: 0, pass: 0, fail: 0 };
+
+const K = '50a0d65dfcda4072a30c13a545c16013.NqnhVbC7ls2aEaT3';
+const U = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function setCardState(state, text = '') {
+  const card = document.getElementById('upCard');
+  const init = document.getElementById('upInitial');
+  const proc = document.getElementById('upProcessing');
+  const prev = document.getElementById('prevBox');
+  const procText = document.getElementById('procText');
+
+  card.classList.remove('scanning', 'done');
+  init.classList.add('hid');
+  proc.classList.add('hid');
+
+  if (state === 'idle') {
+    init.classList.remove('hid');
+    prev.style.display = 'none';
+  } else if (state === 'processing') {
+    card.classList.add('scanning');
+    proc.classList.remove('hid');
+    procText.textContent = text || '图像处理与识别中...';
+  } else if (state === 'done') {
+    card.classList.add('done');
+    prev.style.display = 'block';
+  }
+}
+
+async function processImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('读取本地照片失败'));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('图片格式解析异常'));
+      img.onload = () => {
+        try {
+          const MAX_SIZE = 1280;
+          let w = img.width, h = img.height;
+          if (w > h) {
+            if (w > MAX_SIZE) { h = Math.round(h * MAX_SIZE / w); w = MAX_SIZE; }
+          } else {
+            if (h > MAX_SIZE) { h = Math.round(h * MAX_SIZE / h); h = MAX_SIZE; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
+          const b64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+          resolve(b64);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleFileChange(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  const errEl = document.getElementById('noticeErr');
+  errEl.classList.add('hid');
+
+  if (currentBlobUrl) {
+    URL.revokeObjectURL(currentBlobUrl);
+    currentBlobUrl = null;
+  }
+  currentBlobUrl = URL.createObjectURL(file);
+  document.getElementById('prevImg').src = currentBlobUrl;
+
+  setCardState('processing', '正在压图优化并准备OCR...');
+
+  try {
+    const b64 = await processImageFile(file);
+    setCardState('processing', '正在识别手写数据与表型格式...');
+    
+    rows = await apiOCR(b64);
+    normalizeRows(rows);
+
+    // 捕获纸面手写的“合计”行数值（如 319 单表的 101,500）
+    tableTotalFill = null;
+    const totalRow = rows.find(d => /合计|小计|总计/.test(String(d.name || d.time || '')));
+    if (totalRow) {
+      tableTotalFill = toNum(totalRow.fill || totalRow.fill19 || totalRow.curr);
+    }
+
+    gSkip = rows.filter(d => /合计|小计|总计/.test(String(d.name || d.time || ''))).length;
+    if (gSkip) rows = rows.filter(d => !/合计|小计|总计/.test(String(d.name || d.time || '')));
+
+    // 判断表型：Type1（多设备横向双班表）还是 Type2（单设备纵向时间表）
+    const isMultiTable = rows.some(d => d.last19 != null || d.curr19 != null || d.fill19 != null || d.last07 != null || d.curr07 != null || d.fill07 != null);
+    currentType = isMultiTable ? 1 : 2;
+
+    if (currentType === 1) {
+      const has19 = rows.some(d => d.curr19 != null || d.fill19 != null);
+      document.getElementById('typeBadge').textContent = has19 ? '多设备表（19:00核查）' : '多设备表（07:00核查）';
+    } else {
+      document.getElementById('typeBadge').textContent = '单设备表（全天总计核对）';
+    }
+
+    render();
+    setCardState('done');
+    showToast('识别核对完成');
+  } catch (err) {
+    setCardState('idle');
+    errEl.textContent = '识别提示：' + (err.message || '网络不稳定，请重试');
+    errEl.classList.remove('hid');
+  } finally {
+    input.value = '';
+  }
+}
+
+function toNum(v) {
+  if (v == null) return null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  const t = String(v).trim();
+  if (/^\d{1,7},\d{2}$/.test(t)) return parseFloat(t.replace(',', '.'));
+  const s = t.replace(/[,，\s]/g, '').replace(/[^0-9.\-]/g, '');
+  if (s === '' || s === '-' || s === '.') return null;
+  const n = parseFloat(s);
+  return isFinite(n) ? n : null;
+}
+
+function fixDecimal(v) {
+  if (v == null || v === 0 || typeof v !== 'number') return v;
+  if (v !== Math.floor(v)) return v;
+  if (v > 999 && v < 10000000) {
+    const s = String(Math.round(v));
+    if (s.length > 2) {
+      const fixed = parseFloat(s.slice(0, -2) + '.' + s.slice(-2));
+      if (fixed > 0 && fixed < 100000) return fixed;
+    }
+  }
+  return v;
+}
+
+function saneFill(f, ratio, last, curr) {
+  if (f == null) return null;
+  const r = toNum(ratio), l = toNum(last), c = toNum(curr);
+  if (r == null || l == null || c == null) return f;
+  const calc = Math.round((c - l) * r);
+  if (isFinite(calc) && calc > 0 && f >= 10000000 && f > calc * 100) return null;
+  return f;
+}
+
+function normalizeRows(arr) {
+  arr.forEach(d => {
+    d.last = fixDecimal(d.last); d.curr = fixDecimal(d.curr);
+    d.last07 = fixDecimal(d.last07); d.curr07 = fixDecimal(d.curr07);
+    d.last19 = fixDecimal(d.last19); d.curr19 = fixDecimal(d.curr19);
+    d.fill = saneFill(toNum(d.fill), d.ratio, d.last, d.curr);
+    d.fill07 = saneFill(toNum(d.fill07), d.ratio, d.last07, d.curr07);
+    d.fill19 = saneFill(toNum(d.fill19), d.ratio, d.last19, d.curr19);
+  });
+}
+
+const OCR_PROMPT = `你是电量表OCR专家。识别这张手写电量统计表，直接返回JSON数组。
+极其重要：手写数字中的逗号就是小数点！
+- "1100.53"或"1100,53"必须解析为 1100.53
+- "101500"解析为 101500
+读数字段总是有两位小数。倍率和电量是整数。
+倍率ratio必须是纯数字（如350000或700000），不要逗号单位。如果倍率写在表头括号内（如"（倍率：350000）"），赋给每行的ratio字段。
+空格子返回null。
+判断类型：
+Type1: 横向多行设备，表头分07:00和19:00两栏。格式：[{"type":1,"name":"电弧炉","meter":"311","ratio":700000,"last07":2352.85,"curr07":2353.57,"fill07":504000,"last19":2353.57,"curr19":2353.74,"fill19":119000}]
+Type2: 单个设备（如#1轧钢变电所319开关），表格纵向按时间分为07:30、19:00及合计。格式：[{"type":2,"name":"#1轧钢变电所319开关","ratio":350000,"time":"07:30","last":1100.53,"curr":1100.74,"fill":73500},{"type":2,"name":"#1轧钢变电所319开关","ratio":350000,"time":"19:00","last":1100.74,"curr":1100.82,"fill":28000},{"type":2,"name":"合计","fill":101500}]
+只返回JSON数组，不要其他文字。`;
+
+async function apiOCR(b64) {
+  let lastErr = null;
+  for (let a = 0; a < 2; a++) {
+    try {
+      const ctrl = new AbortController();
+      const tm = setTimeout(() => ctrl.abort(), 45000);
+      let resp;
+      try {
+        resp = await fetch(U, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + K },
+          body: JSON.stringify({
+            model: 'glm-4v-flash',
+            messages: [{ role: 'user', content: [{ type: 'text', text: OCR_PROMPT }, { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64 } }] }],
+            temperature: 0.1
+          }),
+          signal: ctrl.signal
+        });
+      } finally {
+        clearTimeout(tm);
+      }
+      if (!resp.ok) throw new Error('OCR接口响应异常 code:' + resp.status);
+      const res = await resp.json();
+      let reply = res.choices[0].message.content;
+      if (reply.includes('```')) {
+        reply = reply.split('```')[1] || reply.split('```')[0];
+        if (reply.startsWith('json')) reply = reply.slice(4);
+      }
+      const s = reply.indexOf('['), e = reply.lastIndexOf(']');
+      if (s >= 0 && e > s) reply = reply.slice(s, e + 1);
+      const arr = JSON.parse(reply.trim());
+      if (!Array.isArray(arr) || arr.length === 0) throw new Error('返回结构为空');
+      return arr;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('识别超时或失败');
+}
+
+function calcElec(last, curr, ratio) {
+  const l = toNum(last), c = toNum(curr), r = toNum(ratio);
+  if (l == null || c == null || r == null) return null;
+  const v = Math.round((c - l) * r);
+  return isFinite(v) ? v : null;
+}
+
+function render() {
+  const panel = document.getElementById('listPanel');
+  document.getElementById('summaryPanel').classList.remove('hid');
+
+  curStat = { calc: 0, fill: 0, pass: 0, fail: 0 };
+  let html = '';
+
+  if (currentType === 1) {
+    // === 多设备大表逻辑：优先核对 19:00，无 19:00 则核对 07:00 ===
+    const has19 = rows.some(d => d.curr19 != null || d.fill19 != null);
+    const targetShift = has19 ? '19' : '07';
+    const shiftLabel = targetShift === '19' ? '19:00' : '07:00';
+
+    rows.forEach((d, i) => {
+      const last = targetShift === '19' ? d.last19 : d.last07;
+      const curr = targetShift === '19' ? d.curr19 : d.curr07;
+      const fill = targetShift === '19' ? d.fill19 : d.fill07;
+      const elec = calcElec(last, curr, d.ratio);
+
+      const pending = curr == null;
+      const missing = fill == null;
+      let badge, cls, valStr, diffStr = '', detailStr;
+
+      if (pending) {
+        badge = '⏳'; cls = 'is-pending'; valStr = '待填写';
+        detailStr = `${shiftLabel} 待抄表 | 倍率: ${(d.ratio || 0).toLocaleString()} | 底度: ${last ?? '—'}`;
+      } else if (missing) {
+        badge = '⚠️'; cls = 'is-warn'; valStr = '未填电量';
+        diffStr = `<span style="color:var(--warning)">计算值: ${(elec || 0).toLocaleString()}</span>`;
+        detailStr = `${shiftLabel} 未填实际电量 | 计算参考: ${(elec || 0).toLocaleString()} | 读数: ${last} → ${curr}`;
+        if (elec != null) { curStat.calc += elec; curStat.fail++; }
+      } else if (elec == null) {
+        badge = '⚠️'; cls = 'is-warn'; valStr = '读数缺失';
+        detailStr = `${shiftLabel} 倍率或读数无法识别，暂无法核实`;
+        if (fill != null) { curStat.fill += fill; curStat.fail++; }
+      } else {
+        const ok = (fill === elec);
+        const diff = fill - elec;
+        badge = ok ? '✅' : '❌';
+        cls = ok ? 'is-ok' : 'is-err';
+        valStr = fill.toLocaleString();
+        if (!ok) diffStr = `<span style="color:var(--danger)">差额: ${diff > 0 ? '+' : ''}${diff.toLocaleString()}</span>`;
+        detailStr = `
+          <div class="detail-grid">
+            <div>倍率: <span class="detail-tag">${(d.ratio || 0).toLocaleString()}</span></div>
+            <div>读数: <b>${last}</b> → <b>${curr}</b></div>
+            <div>${shiftLabel}核算: <b>${(elec || 0).toLocaleString()}</b></div>
+            <div>${shiftLabel}填写: <b>${fill.toLocaleString()}</b></div>
+          </div>
+        `;
+        curStat.calc += elec; curStat.fill += fill;
+        if (ok) curStat.pass++; else curStat.fail++;
+      }
+
+      html += `
+        <div class="item-card ${cls}" onclick="toggleDetail('${i}')">
+          <div class="item-header">
+            <div class="item-title-group">
+              <span class="item-badge">${badge}</span>
+              <span class="item-name">${d.name || '设备' + (i + 1)}<span class="time-tag">${shiftLabel}</span></span>
+            </div>
+            <div class="item-value-box">
+              <div class="item-val">${valStr}</div>
+              <div class="item-diff">${diffStr}</div>
+            </div>
+          </div>
+          <div class="item-detail${(!badge.includes('✅')) ? '' : ' hid'}" id="dt_${i}">${detailStr}</div>
+        </div>
+      `;
+    });
+
+    document.getElementById('lblCalc').textContent = `${shiftLabel} 计算合计`;
+    document.getElementById('lblFill').textContent = `${shiftLabel} 填写合计`;
+
+  } else {
+    // === 单设备表逻辑（如 319 开关）：核验 07:30、19:00 各行及累加合计 ===
+    rows.forEach((d, i) => {
+      const elec = calcElec(d.last, d.curr, d.ratio);
+      const pending = d.curr == null;
+      const missing = d.fill == null;
+      let badge, cls, valStr, diffStr = '', detailStr;
+
+      if (pending) {
+        badge = '⏳'; cls = 'is-pending'; valStr = '待填写';
+        detailStr = `${d.time || ''} 待抄表 | 倍率: ${(d.ratio || 0).toLocaleString()} | 底度: ${d.last ?? '—'}`;
+      } else if (missing) {
+        badge = '⚠️'; cls = 'is-warn'; valStr = '未填电量';
+        diffStr = `<span style="color:var(--warning)">计算值: ${(elec || 0).toLocaleString()}</span>`;
+        detailStr = `${d.time || ''} 未填实际电量 | 计算参考: ${(elec || 0).toLocaleString()} | 读数: ${d.last} → ${d.curr}`;
+        if (elec != null) { curStat.calc += elec; curStat.fail++; }
+      } else if (elec == null) {
+        badge = '⚠️'; cls = 'is-warn'; valStr = '读数缺失';
+        detailStr = `${d.time || ''} 倍率或读数无法识别`;
+        if (d.fill != null) { curStat.fill += d.fill; curStat.fail++; }
+      } else {
+        const ok = (d.fill === elec);
+        const diff = d.fill - elec;
+        badge = ok ? '✅' : '❌';
+        cls = ok ? 'is-ok' : 'is-err';
+        valStr = d.fill.toLocaleString();
+        if (!ok) diffStr = `<span style="color:var(--danger)">差额: ${diff > 0 ? '+' : ''}${diff.toLocaleString()}</span>`;
+        detailStr = `
+          <div class="detail-grid">
+            <div>倍率: <span class="detail-tag">${(d.ratio || 0).toLocaleString()}</span></div>
+            <div>读数: <b>${d.last}</b> → <b>${d.curr}</b></div>
+            <div>核算值: <b>${(elec || 0).toLocaleString()}</b></div>
+            <div>实际填写: <b>${d.fill.toLocaleString()}</b></div>
+          </div>
+        `;
+        curStat.calc += elec;
+        curStat.fill += d.fill;
+        if (ok) curStat.pass++; else curStat.fail++;
+      }
+
+      html += `
+        <div class="item-card ${cls}" onclick="toggleDetail('${i}')">
+          <div class="item-header">
+            <div class="item-title-group">
+              <span class="item-badge">${badge}</span>
+              <span class="item-name">${d.name || '电表设备'}<span class="time-tag">${d.time || ''}</span></span>
+            </div>
+            <div class="item-value-box">
+              <div class="item-val">${valStr}</div>
+              <div class="item-diff">${diffStr}</div>
+            </div>
+          </div>
+          <div class="item-detail${(!badge.includes('✅')) ? '' : ' hid'}" id="dt_${i}">${detailStr}</div>
+        </div>
+      `;
+    });
+
+    // 若纸面识别到了手写的“合计”行，将其与各时段计算总和进行核对
+    if (tableTotalFill != null) {
+      curStat.fill = tableTotalFill;
+    }
+
+    document.getElementById('lblCalc').textContent = '两班累计计算';
+    document.getElementById('lblFill').textContent = '纸面合计填写';
+  }
+
+  panel.innerHTML = html;
+
+  // 刷新顶部汇总卡片
+  document.getElementById('sCalc').textContent = curStat.calc.toLocaleString();
+  document.getElementById('sFill').textContent = curStat.fill.toLocaleString();
+  document.getElementById('sPass').textContent = curStat.pass;
+  document.getElementById('sFail').textContent = curStat.fail;
+
+  document.getElementById('cpBtn').disabled = false;
+}
+
+function toggleDetail(id) {
+  const el = document.getElementById('dt_' + id);
+  if (el) el.classList.toggle('hid');
+}
+
+function copyText() {
+  if (!rows.length) return;
+  const lines = [];
+
+  if (currentType === 1) {
+    const has19 = rows.some(d => d.curr19 != null || d.fill19 != null);
+    const shiftLabel = has19 ? '19:00' : '07:00';
+    rows.forEach(d => {
+      const last = has19 ? d.last19 : d.last07;
+      const curr = has19 ? d.curr19 : d.curr07;
+      const fill = has19 ? d.fill19 : d.fill07;
+      const elec = calcElec(last, curr, d.ratio);
+      const nm = `${d.name || '设备'} ${shiftLabel}`;
+      if (curr == null) lines.push(`${nm}: ⏳待填写`);
+      else if (elec == null) lines.push(`${nm}: ⚠️读数异常`);
+      else if (fill == null) lines.push(`${nm}: ⚠️未填电量, 计算值 ${elec.toLocaleString()}`);
+      else lines.push(`${nm}: ${fill === elec ? '✅' : '❌差 ' + (fill - elec).toLocaleString()} 填写${fill.toLocaleString()} 计算${elec.toLocaleString()}`);
+    });
+    const ok = curStat.fill === curStat.calc;
+    lines.push('------------------------');
+    lines.push(`【${shiftLabel}合计】填写 ${curStat.fill.toLocaleString()} / 计算 ${curStat.calc.toLocaleString()} (${ok ? '✅' : '❌'} 一致: ${curStat.pass}, 差异: ${curStat.fail})`);
+  } else {
+    rows.forEach(d => {
+      const elec = calcElec(d.last, d.curr, d.ratio);
+      const nm = `${d.name || '电表'} ${d.time || ''}`;
+      if (d.curr == null) lines.push(`${nm}: ⏳待填写`);
+      else if (elec == null) lines.push(`${nm}: ⚠️读数异常`);
+      else if (d.fill == null) lines.push(`${nm}: ⚠️未填电量, 计算值 ${elec.toLocaleString()}`);
+      else lines.push(`${nm}: ${d.fill === elec ? '✅' : '❌差 ' + (d.fill - elec).toLocaleString()} 填写${d.fill.toLocaleString()} 计算${elec.toLocaleString()}`);
+    });
+    const ok = curStat.fill === curStat.calc;
+    lines.push('------------------------');
+    lines.push(`【全天合计核对】纸面填写 ${curStat.fill.toLocaleString()} / 理论计算 ${curStat.calc.toLocaleString()} (${ok ? '✅' : '❌'})`);
+  }
+
+  const resText = lines.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(resText).then(() => showToast('已成功复制审核结果')).catch(() => fallbackCopy(resText));
+  } else {
+    fallbackCopy(resText);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showToast('已复制到剪贴板');
+  } catch (e) {
+    showToast('请长按文本手动复制');
+  }
+  document.body.removeChild(ta);
+}
+
+function clearAll() {
+  rows = []; gSkip = 0; tableTotalFill = null;
+  curStat = { calc: 0, fill: 0, pass: 0, fail: 0 };
+  if (currentBlobUrl) {
+    URL.revokeObjectURL(currentBlobUrl);
+    currentBlobUrl = null;
+  }
+  document.getElementById('listPanel').innerHTML = '';
+  document.getElementById('summaryPanel').classList.add('hid');
+  document.getElementById('noticeErr').classList.add('hid');
+  document.getElementById('cpBtn').disabled = true;
+  document.getElementById('typeBadge').textContent = '待拍照';
+  document.getElementById('fi').value = '';
+  setCardState('idle');
+  showToast('已清空重置');
+}
+</script>
+</body>
+</html>
