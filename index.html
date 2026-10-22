@@ -271,7 +271,7 @@ async function processImageFile(file) {
       img.onerror = () => reject(new Error('图片格式解析异常'));
       img.onload = () => {
         try {
-          const MAX_SIZE = 1280;
+          const MAX_SIZE = 800;
           let w = img.width, h = img.height;
           if (w > h) {
             if (w > MAX_SIZE) { h = Math.round(h * MAX_SIZE / w); w = MAX_SIZE; }
@@ -284,7 +284,7 @@ async function processImageFile(file) {
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, w, h);
-          const b64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+          const b64 = canvas.toDataURL('image/jpeg', 0.65).split(',')[1];
           resolve(b64);
         } catch (err) {
           reject(err);
