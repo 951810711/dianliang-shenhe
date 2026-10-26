@@ -229,7 +229,11 @@ let currentBlobUrl = null;
 let curStat = { calc: 0, fill: 0, pass: 0, fail: 0 };
 
 const K = '50a0d65dfcda4072a30c13a545c16013.NqnhVbC7ls2aEaT3';
-const U = 'https://corsproxy.io/?url=https%3A%2F%2Fopen.bigmodel.cn%2Fapi%2Fpaas%2Fv4%2Fchat%2Fcompletions';
+// 识别通道：优先直连智谱接口；直连不可用时自动回退到公共代理（corsproxy.io 已出现 401，故仅作备用）
+const API_URLS = [
+  'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+  'https://corsproxy.io/?url=https%3A%2F%2Fopen.bigmodel.cn%2Fapi%2Fpaas%2Fv4%2Fchat%2Fcompletions'
+];
 
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -410,13 +414,14 @@ Type2: 单个设备（如#1轧钢变电所319开关），表格纵向按时间�
 
 async function apiOCR(b64) {
   let lastErr = null;
-  for (let a = 0; a < 2; a++) {
+  for (let a = 0; a < API_URLS.length * 2; a++) {
+    const endpoint = API_URLS[a % API_URLS.length];
     try {
       const ctrl = new AbortController();
       const tm = setTimeout(() => ctrl.abort(), 45000);
       let resp;
       try {
-        resp = await fetch(U, {
+        resp = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + K },
           body: JSON.stringify({
